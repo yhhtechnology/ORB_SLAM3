@@ -1,21 +1,27 @@
 /**
 * This file is part of ORB-SLAM3
 *
-* Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez Rodríguez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
-* Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
+* Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez
+* Rodríguez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
+* Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós,
+* University of Zaragoza.
 *
-* ORB-SLAM3 is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-* License as published by the Free Software Foundation, either version 3 of the License, or
+* ORB-SLAM3 is free software: you can redistribute it and/or modify it under the
+* terms of the GNU General Public
+* License as published by the Free Software Foundation, either version 3 of the
+* License, or
 * (at your option) any later version.
 *
-* ORB-SLAM3 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-* the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* ORB-SLAM3 is distributed in the hope that it will be useful, but WITHOUT ANY
+* WARRANTY; without even
+* the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the
 * GNU General Public License for more details.
 *
-* You should have received a copy of the GNU General Public License along with ORB-SLAM3.
+* You should have received a copy of the GNU General Public License along with
+* ORB-SLAM3.
 * If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #ifndef MAP_H
 #define MAP_H
@@ -29,9 +35,7 @@
 
 #include <boost/serialization/base_object.hpp>
 
-
-namespace ORB_SLAM3
-{
+namespace ORB_SLAM3 {
 
 class MapPoint;
 class KeyFrame;
@@ -39,10 +43,8 @@ class Atlas;
 class KeyFrameDatabase;
 class GeometricCamera;
 
-class Map
-{
-
-public:
+class Map {
+ public:
     Map();
     Map(int initKFid);
     ~Map();
@@ -51,7 +53,7 @@ public:
     void AddMapPoint(MapPoint* pMP);
     void EraseMapPoint(MapPoint* pMP);
     void EraseKeyFrame(KeyFrame* pKF);
-    void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
+    void SetReferenceMapPoints(const std::vector<MapPoint*>& vpMPs);
     void InformNewBigChange();
     int GetLastBigChangeIdx();
 
@@ -60,7 +62,7 @@ public:
     std::vector<MapPoint*> GetReferenceMapPoints();
 
     long unsigned int MapPointsInMap();
-    long unsigned  KeyFramesInMap();
+    long unsigned KeyFramesInMap();
 
     long unsigned int GetId();
 
@@ -89,8 +91,12 @@ public:
     void SetImuInitialized();
     bool isImuInitialized();
 
-    void RotateMap(const cv::Mat &R);
-    void ApplyScaledRotation(const cv::Mat &R, const float s, const bool bScaledVel=false, const cv::Mat t=cv::Mat::zeros(cv::Size(1,3),CV_32F));
+    void RotateMap(const cv::Mat& R);
+    void ApplyScaledRotation(const cv::Mat& R,
+                             const float s,
+                             const bool bScaledVel = false,
+                             const cv::Mat t = cv::Mat::zeros(cv::Size(1, 3),
+                                                              CV_32F));
 
     void SetInertialSensor();
     bool IsInertial();
@@ -110,7 +116,8 @@ public:
     KeyFrame* mpFirstRegionKF;
     std::mutex mMutexMapUpdate;
 
-    // This avoid that two points are created simultaneously in separate threads (id conflict)
+    // This avoid that two points are created simultaneously in separate threads
+    // (id conflict)
     std::mutex mMutexPointCreation;
 
     bool mbFail;
@@ -121,8 +128,7 @@ public:
 
     static long unsigned int nNextId;
 
-protected:
-
+ protected:
     long unsigned int mnId;
 
     std::set<MapPoint*> mspMapPoints;
@@ -145,7 +151,6 @@ protected:
     // Index related to a big change in the map (loop closure, global BA)
     int mnBigChangeIdx;
 
-
     // View of the map in aerial sight (for the AtlasViewer)
     GLubyte* mThumbnail;
 
@@ -160,6 +165,6 @@ protected:
     std::mutex mMutexMap;
 };
 
-} //namespace ORB_SLAM3
+}  // namespace ORB_SLAM3
 
-#endif // MAP_H
+#endif  // MAP_H

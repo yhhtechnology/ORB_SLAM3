@@ -1,21 +1,27 @@
 /**
 * This file is part of ORB-SLAM3
 *
-* Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez Rodríguez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
-* Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
+* Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez
+* Rodríguez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.
+* Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós,
+* University of Zaragoza.
 *
-* ORB-SLAM3 is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-* License as published by the Free Software Foundation, either version 3 of the License, or
+* ORB-SLAM3 is free software: you can redistribute it and/or modify it under the
+* terms of the GNU General Public
+* License as published by the Free Software Foundation, either version 3 of the
+* License, or
 * (at your option) any later version.
 *
-* ORB-SLAM3 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
-* the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* ORB-SLAM3 is distributed in the hope that it will be useful, but WITHOUT ANY
+* WARRANTY; without even
+* the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+* See the
 * GNU General Public License for more details.
 *
-* You should have received a copy of the GNU General Public License along with ORB-SLAM3.
+* You should have received a copy of the GNU General Public License along with
+* ORB-SLAM3.
 * If not, see <http://www.gnu.org/licenses/>.
 */
-
 
 #ifndef KEYFRAMEDATABASE_H
 #define KEYFRAMEDATABASE_H
@@ -33,56 +39,58 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/list.hpp>
 
-#include<mutex>
+#include <mutex>
 
-
-namespace ORB_SLAM3
-{
+namespace ORB_SLAM3 {
 
 class KeyFrame;
 class Frame;
 class Map;
 
+class KeyFrameDatabase {
+ public:
+    KeyFrameDatabase(const ORBVocabulary& voc);
 
-class KeyFrameDatabase
-{
+    void add(KeyFrame* pKF);
 
-public:
+    void erase(KeyFrame* pKF);
 
-    KeyFrameDatabase(const ORBVocabulary &voc);
+    void clear();
+    void clearMap(Map* pMap);
 
-   void add(KeyFrame* pKF);
+    // Loop Detection(DEPRECATED)
+    std::vector<KeyFrame*> DetectLoopCandidates(KeyFrame* pKF, float minScore);
 
-   void erase(KeyFrame* pKF);
+    // Loop and Merge Detection
+    void DetectCandidates(KeyFrame* pKF,
+                          float minScore,
+                          vector<KeyFrame*>& vpLoopCand,
+                          vector<KeyFrame*>& vpMergeCand);
+    void DetectBestCandidates(KeyFrame* pKF,
+                              vector<KeyFrame*>& vpLoopCand,
+                              vector<KeyFrame*>& vpMergeCand,
+                              int nMinWords);
+    void DetectNBestCandidates(KeyFrame* pKF,
+                               vector<KeyFrame*>& vpLoopCand,
+                               vector<KeyFrame*>& vpMergeCand,
+                               int nNumCandidates);
 
-   void clear();
-   void clearMap(Map* pMap);
+    // Relocalization
+    std::vector<KeyFrame*> DetectRelocalizationCandidates(Frame* F, Map* pMap);
 
-   // Loop Detection(DEPRECATED)
-   std::vector<KeyFrame *> DetectLoopCandidates(KeyFrame* pKF, float minScore);
+    void SetORBVocabulary(ORBVocabulary* pORBVoc);
 
-   // Loop and Merge Detection
-   void DetectCandidates(KeyFrame* pKF, float minScore,vector<KeyFrame*>& vpLoopCand, vector<KeyFrame*>& vpMergeCand);
-   void DetectBestCandidates(KeyFrame *pKF, vector<KeyFrame*> &vpLoopCand, vector<KeyFrame*> &vpMergeCand, int nMinWords);
-   void DetectNBestCandidates(KeyFrame *pKF, vector<KeyFrame*> &vpLoopCand, vector<KeyFrame*> &vpMergeCand, int nNumCandidates);
+ protected:
+    // Associated vocabulary
+    const ORBVocabulary* mpVoc;
 
-   // Relocalization
-   std::vector<KeyFrame*> DetectRelocalizationCandidates(Frame* F, Map* pMap);
+    // Inverted file
+    std::vector<list<KeyFrame*> > mvInvertedFile;
 
-   void SetORBVocabulary(ORBVocabulary* pORBVoc);
-
-protected:
-
-  // Associated vocabulary
-  const ORBVocabulary* mpVoc;
-
-  // Inverted file
-  std::vector<list<KeyFrame*> > mvInvertedFile;
-
-  // Mutex
-  std::mutex mMutex;
+    // Mutex
+    std::mutex mMutex;
 };
 
-} //namespace ORB_SLAM
+}  // namespace ORB_SLAM
 
 #endif

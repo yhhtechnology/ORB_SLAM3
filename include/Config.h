@@ -3,4 +3,4 @@
 
 //#define REGISTER_TIMES
 
-#endif // CONFIG_H
+#endif  // CONFIG_H
