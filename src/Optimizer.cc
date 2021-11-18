@@ -820,28 +820,19 @@ void Optimizer::FullInertialBA(Map* pMap,
 int Optimizer::PoseOptimization(Frame* pFrame) {
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolver_6_3::LinearSolverType* linearSolver;
-
-    linearSolver =
-        new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
-
+    linearSolver = new g2o::LinearSolverDense<g2o::BlockSolver_6_3::PoseMatrixType>();
     g2o::BlockSolver_6_3* solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
-
-    g2o::OptimizationAlgorithmLevenberg* solver =
-        new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
     optimizer.setAlgorithm(solver);
-
     int nInitialCorrespondences = 0;
-
     // Set Frame vertex
     g2o::VertexSE3Expmap* vSE3 = new g2o::VertexSE3Expmap();
     vSE3->setEstimate(Converter::toSE3Quat(pFrame->mTcw));
     vSE3->setId(0);
     vSE3->setFixed(false);
     optimizer.addVertex(vSE3);
-
     // Set MapPoint vertices
     const int N = pFrame->N;
-
     vector<ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose*> vpEdgesMono;
     vector<ORB_SLAM3::EdgeSE3ProjectXYZOnlyPoseToBody*> vpEdgesMono_FHR;
     vector<size_t> vnIndexEdgeMono, vnIndexEdgeRight;
@@ -849,7 +840,6 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
     vpEdgesMono_FHR.reserve(N);
     vnIndexEdgeMono.reserve(N);
     vnIndexEdgeRight.reserve(N);
-
     vector<g2o::EdgeStereoSE3ProjectXYZOnlyPose*> vpEdgesStereo;
     vector<size_t> vnIndexEdgeStereo;
     vpEdgesStereo.reserve(N);
@@ -4036,6 +4026,7 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
             if (pMP)
                 if (!pMP->isBad())
                     if (pMP->mnBALocalForKF != pKF->mnId) {
+                        // 判断一下, 放置重新插入
                         lLocalMapPoints.push_back(pMP);
                         pMP->mnBALocalForKF = pKF->mnId;
                     }

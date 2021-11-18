@@ -475,36 +475,36 @@ MapPoint *KeyFrame::GetMapPoint(const size_t &idx) {
     return mvpMapPoints[idx];
 }
 
+
+// （1）获得该关键帧的所有路标点，并寻找共视关键帧。
+// （2）建立当前关键帧和共视关键帧的联系，其中权值为共视帧和当前帧的共视的特征点数。
+// （3）权重必须大于一个阈值，(如果没有超过该阈值的权重，那么就只建立该关键帧和与其共视程度最大的关键帧间的联系。)
+// （4）对这些连接按照权重从大到小进行排序，以方便将来的处理。
 void KeyFrame::UpdateConnections(bool upParent) {
     map<KeyFrame *, int> KFcounter;
-
     vector<MapPoint *> vpMP;
-
     {
         unique_lock<mutex> lockMPs(mMutexFeatures);
         vpMP = mvpMapPoints;
     }
 
     // For all map points in keyframe check in which other keyframes are they
-    // seen
-    // Increase counter for those keyframes
+    // seen Increase counter for those keyframes
+    // 遍历当前帧观测到的地图点, 
     for (vector<MapPoint *>::iterator vit = vpMP.begin(), vend = vpMP.end();
          vit != vend; vit++) {
         MapPoint *pMP = *vit;
-
         if (!pMP) continue;
-
         if (pMP->isBad()) continue;
-
         map<KeyFrame *, tuple<int, int>> observations = pMP->GetObservations();
-
+        // 遍历地图点的观测帧
         for (map<KeyFrame *, tuple<int, int>>::iterator
                  mit = observations.begin(),
                  mend = observations.end();
              mit != mend; mit++) {
-            if (mit->first->mnId == mnId || mit->first->isBad() ||
-                mit->first->GetMap() != mpMap)
+            if (mit->first->mnId == mnId || mit->first->isBad() || mit->first->GetMap() != mpMap) {
                 continue;
+            }
             KFcounter[mit->first]++;
         }
     }
@@ -519,6 +519,7 @@ void KeyFrame::UpdateConnections(bool upParent) {
     KeyFrame *pKFmax = NULL;
     int th = 15;
 
+// （3）权重必须大于一个阈值
     vector<pair<int, KeyFrame *>> vPairs;
     vPairs.reserve(KFcounter.size());
     if (!upParent) cout << "UPDATE_CONN: current KF " << mnId << endl;
@@ -537,8 +538,8 @@ void KeyFrame::UpdateConnections(bool upParent) {
             (mit->first)->AddConnection(this, mit->second);
         }
     }
-
     if (vPairs.empty()) {
+        // ，(如果没有超过该阈值的权重，那么就只建立该关键帧和与其共视程度最大的关键帧间的联系。)
         vPairs.push_back(make_pair(nmax, pKFmax));
         pKFmax->AddConnection(this, nmax);
     }
@@ -553,12 +554,9 @@ void KeyFrame::UpdateConnections(bool upParent) {
 
     {
         unique_lock<mutex> lockCon(mMutexConnections);
-
         mConnectedKeyFrameWeights = KFcounter;
-        mvpOrderedConnectedKeyFrames =
-            vector<KeyFrame *>(lKFs.begin(), lKFs.end());
+        mvpOrderedConnectedKeyFrames = vector<KeyFrame *>(lKFs.begin(), lKFs.end());
         mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
-
         if (mbFirstConnection && mnId != mpMap->GetInitKFid()) {
             mpParent = mvpOrderedConnectedKeyFrames.front();
             mpParent->AddChild(this);

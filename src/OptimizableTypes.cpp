@@ -188,7 +188,6 @@ namespace ORB_SLAM3 {
         return os.good();
     }
 
-
     void EdgeSE3ProjectXYZToBody::linearizeOplus() {
         g2o::VertexSE3Expmap * vj = static_cast<g2o::VertexSE3Expmap *>(_vertices[1]);
         g2o::SE3Quat T_lw(vj->estimate());

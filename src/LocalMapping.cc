@@ -84,76 +84,27 @@ void LocalMapping::SetTracker(Tracking *pTracker) { mpTracker = pTracker; }
 
 void LocalMapping::Run() {
     mbFinished = false;
-
     while (1) {
         // Tracking will see that Local Mapping is busy
         SetAcceptKeyFrames(false);
-
         // Check if there are keyframes in the queue
         if (CheckNewKeyFrames() && !mbBadImu) {
-#ifdef REGISTER_TIMES
-            double timeLBA_ms = 0;
-            double timeKFCulling_ms = 0;
-
-            std::chrono::steady_clock::time_point time_StartProcessKF =
-                std::chrono::steady_clock::now();
-#endif
             // BoW conversion and insertion in Map
             ProcessNewKeyFrame();
-#ifdef REGISTER_TIMES
-            std::chrono::steady_clock::time_point time_EndProcessKF =
-                std::chrono::steady_clock::now();
-
-            double timeProcessKF =
-                std::chrono::duration_cast<
-                    std::chrono::duration<double, std::milli>>(
-                    time_EndProcessKF - time_StartProcessKF)
-                    .count();
-            vdKFInsert_ms.push_back(timeProcessKF);
-#endif
-
             // Check recent MapPoints
             MapPointCulling();
-#ifdef REGISTER_TIMES
-            std::chrono::steady_clock::time_point time_EndMPCulling =
-                std::chrono::steady_clock::now();
-
-            double timeMPCulling =
-                std::chrono::duration_cast<
-                    std::chrono::duration<double, std::milli>>(
-                    time_EndMPCulling - time_EndProcessKF)
-                    .count();
-            vdMPCulling_ms.push_back(timeMPCulling);
-#endif
             // Triangulate new MapPoints
             CreateNewMapPoints();
-
             mbAbortBA = false;
-
             if (!CheckNewKeyFrames()) {
-                // Find more matches in neighbor keyframes and fuse point
-                // duplications
+                // Find more matches in neighbor keyframes and fuse point duplications
                 SearchInNeighbors();
             }
-
-#ifdef REGISTER_TIMES
-            std::chrono::steady_clock::time_point time_EndMPCreation =
-                std::chrono::steady_clock::now();
-
-            double timeMPCreation =
-                std::chrono::duration_cast<
-                    std::chrono::duration<double, std::milli>>(
-                    time_EndMPCreation - time_EndMPCulling)
-                    .count();
-            vdMPCreation_ms.push_back(timeMPCreation);
-#endif
-
             bool b_doneLBA = false;
             int num_FixedKF_BA = 0;
             int num_OptKF_BA = 0;
             int num_MPs_BA = 0;
             int num_edges_BA = 0;
-
             if (!CheckNewKeyFrames() && !stopRequested()) {
                 if (mpAtlas->KeyFramesInMap() > 2) {
                     if (mbInertial &&
@@ -200,28 +151,6 @@ void LocalMapping::Run() {
                         b_doneLBA = true;
                     }
                 }
-#ifdef REGISTER_TIMES
-                std::chrono::steady_clock::time_point time_EndLBA =
-                    std::chrono::steady_clock::now();
-
-                if (b_doneLBA) {
-                    timeLBA_ms = std::chrono::duration_cast<
-                                     std::chrono::duration<double, std::milli>>(
-                                     time_EndLBA - time_EndMPCreation)
-                                     .count();
-                    vdLBASync_ms.push_back(timeLBA_ms);
-
-                    nLBA_exec += 1;
-                    if (mbAbortBA) {
-                        nLBA_abort += 1;
-                    }
-                    vnLBA_edges.push_back(num_edges_BA);
-                    vnLBA_KFopt.push_back(num_OptKF_BA);
-                    vnLBA_KFfixed.push_back(num_FixedKF_BA);
-                    vnLBA_MPs.push_back(num_MPs_BA);
-                }
-
-#endif
 
                 // Initialize IMU here
                 if (!mpCurrentKeyFrame->GetMap()->isImuInitialized() &&
@@ -234,18 +163,6 @@ void LocalMapping::Run() {
 
                 // Check redundant local Keyframes
                 KeyFrameCulling();
-
-#ifdef REGISTER_TIMES
-                std::chrono::steady_clock::time_point time_EndKFCulling =
-                    std::chrono::steady_clock::now();
-
-                timeKFCulling_ms =
-                    std::chrono::duration_cast<
-                        std::chrono::duration<double, std::milli>>(
-                        time_EndKFCulling - time_EndLBA)
-                        .count();
-                vdKFCullingSync_ms.push_back(timeKFCulling_ms);
-#endif
 
                 if ((mTinit < 100.0f) && mbInertial) {
                     if (mpCurrentKeyFrame->GetMap()->isImuInitialized() &&
@@ -261,8 +178,7 @@ void LocalMapping::Run() {
 
                                 cout << "end VIBA 1" << endl;
                             }
-                        } else if (!mpCurrentKeyFrame->GetMap()
-                                        ->GetIniertialBA2()) {
+                        } else if (!mpCurrentKeyFrame->GetMap()->GetIniertialBA2()) {
                             if (mTinit > 15.0f) {
                                 cout << "start VIBA 2" << endl;
                                 mpCurrentKeyFrame->GetMap()->SetIniertialBA2();
@@ -290,25 +206,8 @@ void LocalMapping::Run() {
                     }
                 }
             }
-
-#ifdef REGISTER_TIMES
-            vdLBA_ms.push_back(timeLBA_ms);
-            vdKFCulling_ms.push_back(timeKFCulling_ms);
-#endif
-
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
 
-#ifdef REGISTER_TIMES
-            std::chrono::steady_clock::time_point time_EndLocalMap =
-                std::chrono::steady_clock::now();
-
-            double timeLocalMap =
-                std::chrono::duration_cast<
-                    std::chrono::duration<double, std::milli>>(
-                    time_EndLocalMap - time_StartProcessKF)
-                    .count();
-            vdLMTotal_ms.push_back(timeLocalMap);
-#endif
         } else if (Stop() && !mbBadImu) {
             // Safe area to stop
             while (isStopped() && !CheckFinish()) {
@@ -347,19 +246,17 @@ void LocalMapping::ProcessNewKeyFrame() {
         mpCurrentKeyFrame = mlNewKeyFrames.front();
         mlNewKeyFrames.pop_front();
     }
-
     // Compute Bags of Words structures
     mpCurrentKeyFrame->ComputeBoW();
-
     // Associate MapPoints to the new keyframe and update normal and descriptor
     const vector<MapPoint *> vpMapPointMatches =
         mpCurrentKeyFrame->GetMapPointMatches();
-
     for (size_t i = 0; i < vpMapPointMatches.size(); i++) {
         MapPoint *pMP = vpMapPointMatches[i];
         if (pMP) {
             if (!pMP->isBad()) {
                 if (!pMP->IsInKeyFrame(mpCurrentKeyFrame)) {
+                    // 这个点为啥可能不在这个关键帧啊? 哦哦 这里判断了一下如果不在就插入
                     pMP->AddObservation(mpCurrentKeyFrame, i);
                     pMP->UpdateNormalAndDepth();
                     pMP->ComputeDistinctiveDescriptors();
@@ -374,7 +271,6 @@ void LocalMapping::ProcessNewKeyFrame() {
 
     // Update links in the Covisibility Graph
     mpCurrentKeyFrame->UpdateConnections();
-
     // Insert Keyframe in Map
     mpAtlas->AddKeyFrame(mpCurrentKeyFrame);
 }
@@ -385,31 +281,35 @@ void LocalMapping::EmptyQueue() {
 
 void LocalMapping::MapPointCulling() {
     // Check Recent Added MapPoints
+    // mlpRecentAddedMapPoints 来自 ProcessNewKeyFrame 或者 Create NewMapPoints
     list<MapPoint *>::iterator lit = mlpRecentAddedMapPoints.begin();
     const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
-
     int nThObs;
     if (mbMonocular)
         nThObs = 2;
     else
         nThObs = 3;
     const int cnThObs = nThObs;
-
     int borrar = mlpRecentAddedMapPoints.size();
-
     while (lit != mlpRecentAddedMapPoints.end()) {
         MapPoint *pMP = *lit;
-
         if (pMP->isBad())
             lit = mlpRecentAddedMapPoints.erase(lit);
         else if (pMP->GetFoundRatio() < 0.25f) {
+            // 跟踪到该 MapPoint 的Frame数相比预计可观测到该MapPoint的Frame数的比例需大于25%
+            // IncreaseFound / IncreaseVisible < 25%，注意不一定是关键帧。
+            // 最好情况是: 该特征点在N帧中可以看得到, 并且在N帧中都是被找到了并且是内点, 比例为 F_N/V_N=1
             pMP->SetBadFlag();
             lit = mlpRecentAddedMapPoints.erase(lit);
         } else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 2 &&
                    pMP->Observations() <= cnThObs) {
             pMP->SetBadFlag();
+            // VI-B 条件2：从该点建立开始，到现在已经过了不小于2个关键帧
+            // 但是观测到该点的关键帧数却不超过cnThObs帧，那么该点检验不合格
             lit = mlpRecentAddedMapPoints.erase(lit);
         } else if (((int)nCurrentKFid - (int)pMP->mnFirstKFid) >= 3)
+            // 步骤4：从建立该点开始，已经过了3个关键帧而没有被剔除，则认为是质量高的点
+            // 因此没有SetBadFlag()，仅从队列中删除，放弃继续对该MapPoint的检测
             lit = mlpRecentAddedMapPoints.erase(lit);
         else {
             lit++;

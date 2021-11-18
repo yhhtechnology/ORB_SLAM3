@@ -154,7 +154,7 @@ class MapPoint {
     cv::Matx31f mWorldPosx;
 
     // Keyframes observing the point and associated index in keyframe
-    std::map<KeyFrame*, std::tuple<int, int>> mObservations;
+    std::map<KeyFrame*, std::tuple<int, int>> mObservations_;
 
     // Mean viewing direction
     cv::Mat mNormalVector;

@@ -309,6 +309,7 @@ class VertexInvDepth : public g2o::BaseVertex<1, InvDepthPoint> {
     }
 };
 
+// 单目视觉边:   两个定点: 三维坐标点, 相机姿态
 class EdgeMono : public g2o::BaseBinaryEdge<2,
                                             Eigen::Vector2d,
                                             g2o::VertexSBAPointXYZ,
@@ -358,6 +359,7 @@ class EdgeMono : public g2o::BaseBinaryEdge<2,
     const int cam_idx;
 };
 
+// 单目视觉边:   一个定点: 相机姿态
 class EdgeMonoOnlyPose
     : public g2o::BaseUnaryEdge<2, Eigen::Vector2d, VertexPose> {
  public:
@@ -392,6 +394,8 @@ class EdgeMonoOnlyPose
     const int cam_idx;
 };
 
+// 双目视觉边:
+// 定点: 三维坐标点, 相机姿态  和单目不同的是输入的观测不同,这里输入的观测是3维的, 而且是进行过了双目矫正了的数据
 class EdgeStereo : public g2o::BaseBinaryEdge<3,
                                               Eigen::Vector3d,
                                               g2o::VertexSBAPointXYZ,
@@ -464,6 +468,7 @@ class EdgeStereoOnlyPose
     const int cam_idx;
 };
 
+// IMU残差边
 class EdgeInertial : public g2o::BaseMultiEdge<9, Vector9d> {
  public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -514,6 +519,7 @@ class EdgeInertial : public g2o::BaseMultiEdge<9, Vector9d> {
     Eigen::Vector3d g;
 };
 
+// 只用在初始化:
 // Edge inertial whre gravity is included as optimizable variable and it is not
 // supposed to be pointing in -z axis, as well as scale
 class EdgeInertialGS : public g2o::BaseMultiEdge<9, Vector9d> {
