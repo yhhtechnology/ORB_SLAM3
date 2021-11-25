@@ -56,11 +56,14 @@ class Optimizer {
                                  bool *pbStopFlag = NULL,
                                  const unsigned long nLoopKF = 0,
                                  const bool bRobust = true);
+
+    // LoopClosing 和 Tracking 单目初始化
     void static GlobalBundleAdjustemnt(Map *pMap,
                                        int nIterations = 5,
                                        bool *pbStopFlag = NULL,
                                        const unsigned long nLoopKF = 0,
                                        const bool bRobust = true);
+    // LoopClosing 和 LocalMapping IMU初始化
     void static FullInertialBA(Map *pMap,
                                int its,
                                const bool bFixLocal = false,
@@ -72,9 +75,12 @@ class Optimizer {
                                Eigen::VectorXd *vSingVal = NULL,
                                bool *bHess = NULL);
 
+    // 好像没有用诶
     void static LocalBundleAdjustment(KeyFrame *pKF,
                                       bool *pbStopFlag,
                                       vector<KeyFrame *> &vpNonEnoughOptKFs);
+    
+    // LocalMaping : 纯视觉时候调用的 LBA
     void static LocalBundleAdjustment(KeyFrame *pKF,
                                       bool *pbStopFlag,
                                       Map *pMap,
@@ -83,20 +89,24 @@ class Optimizer {
                                       int &num_MPs,
                                       int &num_edges);
 
+    // 好像没有用诶
     void static MergeBundleAdjustmentVisual(KeyFrame *pCurrentKF,
                                             vector<KeyFrame *> vpWeldingKFs,
                                             vector<KeyFrame *> vpFixedKFs,
                                             bool *pbStopFlag);
 
+    // 老版本的单纯只优化姿态: 在 Tracking 线程中,大多在没有IMU或者IMU还没初始化好的时候调用
     int static PoseOptimization(Frame *pFrame);
-
+    //  在 Tracking 线程中, 和上面函数分类讨论调用, IMU初始化好之后可能用
     int static PoseInertialOptimizationLastKeyFrame(Frame *pFrame,
                                                     bool bRecInit = false);
+    //  在 Tracking 线程中, 和上面函数分类讨论调用, IMU初始化好之后可能用
     int static PoseInertialOptimizationLastFrame(Frame *pFrame,
                                                  bool bRecInit = false);
 
     // if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise
     // (mono)
+    // LoopClosing 中调用
     void static OptimizeEssentialGraph(
         Map *pMap,
         KeyFrame *pLoopKF,
@@ -105,6 +115,7 @@ class Optimizer {
         const LoopClosing::KeyFrameAndPose &CorrectedSim3,
         const map<KeyFrame *, set<KeyFrame *> > &LoopConnections,
         const bool &bFixScale);
+    // 好像没有用诶
     void static OptimizeEssentialGraph6DoF(
         KeyFrame *pCurKF,
         vector<KeyFrame *> &vpFixedKFs,
@@ -112,15 +123,18 @@ class Optimizer {
         vector<KeyFrame *> &vpNonFixedKFs,
         vector<MapPoint *> &vpNonCorrectedMPs,
         double scale);
+    // LoopClosing 中调用
     void static OptimizeEssentialGraph(KeyFrame *pCurKF,
                                        vector<KeyFrame *> &vpFixedKFs,
                                        vector<KeyFrame *> &vpFixedCorrectedKFs,
                                        vector<KeyFrame *> &vpNonFixedKFs,
                                        vector<MapPoint *> &vpNonCorrectedMPs);
+    // 好像没有用诶
     void static OptimizeEssentialGraph(
         KeyFrame *pCurKF,
         const LoopClosing::KeyFrameAndPose &NonCorrectedSim3,
         const LoopClosing::KeyFrameAndPose &CorrectedSim3);
+    // LoopClosing 中调用
     // For inetial loopclosing
     void static OptimizeEssentialGraph4DoF(
         Map *pMap,
@@ -130,6 +144,7 @@ class Optimizer {
         const LoopClosing::KeyFrameAndPose &CorrectedSim3,
         const map<KeyFrame *, set<KeyFrame *> > &LoopConnections);
 
+    // LoopClosing 中调用
     // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
     // (OLD)
     static int OptimizeSim3(KeyFrame *pKF1,
@@ -138,6 +153,7 @@ class Optimizer {
                             g2o::Sim3 &g2oS12,
                             const float th2,
                             const bool bFixScale);
+    // LoopClosing 中调用
     // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
     // (NEW)
     static int OptimizeSim3(KeyFrame *pKF1,
@@ -159,7 +175,7 @@ class Optimizer {
                             const bool bAllPoints = false);
 
     // For inertial systems
-
+    // 在LocalMapping 线程中调用做 LBA, 和 LocalBundleAdjustment 对应
     void static LocalInertialBA(KeyFrame *pKF,
                                 bool *pbStopFlag,
                                 Map *pMap,
@@ -170,12 +186,14 @@ class Optimizer {
                                 bool bLarge = false,
                                 bool bRecInit = false);
 
+    // LoopClosing 中调用
     void static MergeInertialBA(KeyFrame *pCurrKF,
                                 KeyFrame *pMergeKF,
                                 bool *pbStopFlag,
                                 Map *pMap,
                                 LoopClosing::KeyFrameAndPose &corrPoses);
 
+    // 在LoopClosing 中调用的
     // Local BA in welding area when two maps are merged
     void static LocalBundleAdjustment(KeyFrame *pMainKF,
                                       vector<KeyFrame *> vpAdjustKF,
@@ -188,10 +206,12 @@ class Optimizer {
     static Eigen::MatrixXd Marginalize(const Eigen::MatrixXd &H,
                                        const int &start,
                                        const int &end);
+    // 没调用??
     // Condition block element (start:end,start:end). Fill with zeros.
     static Eigen::MatrixXd Condition(const Eigen::MatrixXd &H,
                                      const int &start,
                                      const int &end);
+    // 好像没有用诶
     // Remove link between element 1 and 2. Given elements 1,2 and 3 must define
     // the whole matrix.
     static Eigen::MatrixXd Sparsify(const Eigen::MatrixXd &H,
@@ -199,7 +219,7 @@ class Optimizer {
                                     const int &end1,
                                     const int &start2,
                                     const int &end2);
-
+    // 都只用在了初始化时候
     // Inertial pose-graph
     void static InertialOptimization(Map *pMap,
                                      Eigen::Matrix3d &Rwg,
