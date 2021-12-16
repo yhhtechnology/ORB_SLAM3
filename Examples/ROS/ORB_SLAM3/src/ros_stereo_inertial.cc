@@ -41,7 +41,12 @@
 #include "../../../include/System.h"
 #include "../include/ImuTypes.h"
 
+
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+
 using namespace std;
+ros::Publisher pub_localba_pose_;
 
 class ImuGrabber {
  public:
@@ -58,7 +63,8 @@ class ImageGrabber {
                  ImuGrabber *pImuGb,
                  const bool bRect,
                  const bool bClahe)
-        : mpSLAM(pSLAM), mpImuGb(pImuGb), do_rectify(bRect), mbClahe(bClahe) {}
+        : mpSLAM(pSLAM), mpImuGb(pImuGb), do_rectify(bRect), mbClahe(bClahe) {
+    }
 
     void GrabImageLeft(const sensor_msgs::ImageConstPtr &msg);
     void GrabImageRight(const sensor_msgs::ImageConstPtr &msg);
@@ -78,11 +84,45 @@ class ImageGrabber {
     cv::Ptr<cv::CLAHE> mClahe = cv::createCLAHE(3.0, cv::Size(8, 8));
 };
 
+void publish_state(const ORB_SLAM3::PoseState &pose_state_from_localmap) {
+    Eigen::Quaterniond q = pose_state_from_localmap.q_wb;
+    Eigen::Vector3d p = pose_state_from_localmap.p_wb;
+    // Todo time
+    ros::Time time = ros::Time().fromNSec(pose_state_from_localmap.time_sec * 1e9);
+    Eigen::Matrix<double, 6, 6> covariance_posori = pose_state_from_localmap.pose_cov;
+    geometry_msgs::PoseWithCovarianceStampedPtr msg_pose(new geometry_msgs::PoseWithCovarianceStamped);
+    unsigned int poses_seq_frame = 0;
+    msg_pose->header.seq = poses_seq_frame;
+    msg_pose->header.stamp = time;
+    msg_pose->header.frame_id = "localBA";
+    msg_pose->pose.pose.position.x = p[0];
+    msg_pose->pose.pose.position.y = p[1];
+    msg_pose->pose.pose.position.z = p[2];
+    msg_pose->pose.pose.orientation.x = q.x();
+    msg_pose->pose.pose.orientation.y = q.y();
+    msg_pose->pose.pose.orientation.z = q.z();
+    msg_pose->pose.pose.orientation.w = q.w();
+    for(int r = 0; r < 6; r++) {
+        for(int c = 0; c < 6; c++) {
+            msg_pose->pose.covariance[6 * r + c] = covariance_posori(r, c);
+        }
+    }
+    pub_localba_pose_.publish(msg_pose);
+    // std::cout
+    //     <<"pub_localba_pose_.publish(msg_pose)" << "\n"
+    //     << "time_sec = " << pose_state_from_localmap.time_sec << "\n"
+    //     // << "COV =\n " << pose_state_from_localmap.pose_cov << "\n"
+    //     <<"\n"
+    //     ;
+}
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "Stereo_Inertial");
     ros::NodeHandle n("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME,
                                    ros::console::levels::Info);
+        pub_localba_pose_
+        = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ORB3/poseimu", 2);
     bool bEqual = false;
     if (argc < 4 || argc > 5) {
         cerr << endl
@@ -103,9 +143,11 @@ int main(int argc, char **argv) {
     // process frames.
     ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::IMU_STEREO,
                            true);
-
+    auto lba_callback = ORB_SLAM3::LBACallback(std::bind(&publish_state, std::placeholders::_1));
+    SLAM.set_lba_callback(lba_callback);
     ImuGrabber imugb;
     ImageGrabber igb(&SLAM, &imugb, sbRect == "true", bEqual);
+
 
     if (igb.do_rectify) {
         // Load settings related to stereo calibration

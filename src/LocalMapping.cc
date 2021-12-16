@@ -82,6 +82,14 @@ void LocalMapping::SetLoopCloser(LoopClosing *pLoopCloser) {
 
 void LocalMapping::SetTracker(Tracking *pTracker) { mpTracker = pTracker; }
 
+bool LocalMapping::set_lba_callback(LBACallback lba_callback) {
+    if(nullptr == lba_callback) {
+        return false;
+    }
+    lba_callback_ = std::move(lba_callback);
+    return true;
+}
+
 void LocalMapping::Run() {
     mbFinished = false;
 
@@ -186,17 +194,40 @@ void LocalMapping::Run() {
                                        mbMonocular) ||
                                       ((mpTracker->GetMatchesInliers() > 100) &&
                                        !mbMonocular);
+                        ORB_SLAM3::PoseState pose_state_from_localmap;
                         Optimizer::LocalInertialBA(
                             mpCurrentKeyFrame, &mbAbortBA,
-                            mpCurrentKeyFrame->GetMap(), num_FixedKF_BA,
+                            mpCurrentKeyFrame->GetMap(),
+                            &pose_state_from_localmap,
+                            num_FixedKF_BA,
                             num_OptKF_BA, num_MPs_BA, num_edges_BA, bLarge,
                             !mpCurrentKeyFrame->GetMap()->GetIniertialBA2());
+                        if(nullptr != lba_callback_) {
+                            // std::cout
+                            //     << "LBA::LocalInertialBA"<<"\n"
+                            //     << "time_sec = " << pose_state_from_localmap.time_sec << "\n"
+                            //     << "COV =\n " << pose_state_from_localmap.pose_cov << "\n"
+                            //     <<"\n"
+                            //     ;
+                            lba_callback_(pose_state_from_localmap);
+                        }
                         b_doneLBA = true;
                     } else {
+                        ORB_SLAM3::PoseState pose_state_from_localmap;
                         Optimizer::LocalBundleAdjustment(
                             mpCurrentKeyFrame, &mbAbortBA,
                             mpCurrentKeyFrame->GetMap(), num_FixedKF_BA,
-                            num_OptKF_BA, num_MPs_BA, num_edges_BA);
+                            num_OptKF_BA, num_MPs_BA, num_edges_BA,
+                            &pose_state_from_localmap);
+                        if(nullptr != lba_callback_) {
+                            // std::cout
+                            //     << "LBA::LocalBundleAdjustment"<<"\n"
+                            //     << "time_sec = " << pose_state_from_localmap.time_sec << "\n"
+                            //     << "COV =\n " << pose_state_from_localmap.pose_cov << "\n"
+                            //     <<"\n"
+                            //     ;
+                            lba_callback_(pose_state_from_localmap);
+                        }
                         b_doneLBA = true;
                     }
                 }

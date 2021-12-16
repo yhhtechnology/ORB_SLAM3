@@ -31,6 +31,7 @@
 #include "KeyFrame.h"
 #include "LoopClosing.h"
 #include "Frame.h"
+#include "System.h"
 
 #include <math.h>
 
@@ -81,7 +82,8 @@ class Optimizer {
                                       int &num_fixedKF,
                                       int &num_OptKF,
                                       int &num_MPs,
-                                      int &num_edges);
+                                      int &num_edges,
+                                      ORB_SLAM3::PoseState *pose_state_from_localmap);
 
     void static MergeBundleAdjustmentVisual(KeyFrame *pCurrentKF,
                                             vector<KeyFrame *> vpWeldingKFs,
@@ -163,12 +165,14 @@ class Optimizer {
     void static LocalInertialBA(KeyFrame *pKF,
                                 bool *pbStopFlag,
                                 Map *pMap,
+                                ORB_SLAM3::PoseState *pose_state_from_localmap,
                                 int &num_fixedKF,
                                 int &num_OptKF,
                                 int &num_MPs,
                                 int &num_edges,
                                 bool bLarge = false,
-                                bool bRecInit = false);
+                                bool bRecInit = false
+                                );
 
     void static MergeInertialBA(KeyFrame *pCurrKF,
                                 KeyFrame *pMergeKF,

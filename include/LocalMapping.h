@@ -32,18 +32,24 @@
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
 #include "Initializer.h"
+#include "System.h"
 
 #include <mutex>
 
 namespace ORB_SLAM3 {
-
 class System;
 class Tracking;
 class LoopClosing;
 class Atlas;
+struct PoseState;
+using LBACallback = std::function<void(const ORB_SLAM3::PoseState&)>;
 
 class LocalMapping {
  public:
+
+    LBACallback lba_callback_ = nullptr;
+    bool set_lba_callback(LBACallback lba_callback);
+
     LocalMapping(System* pSys,
                  Atlas* pAtlas,
                  const float bMonocular,

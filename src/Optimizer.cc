@@ -1622,7 +1622,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                                       int& num_fixedKF,
                                       int& num_OptKF,
                                       int& num_MPs,
-                                      int& num_edges) {
+                                      int& num_edges,
+                                      ORB_SLAM3::PoseState *pose_state_from_localmap) {
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
 
@@ -1804,6 +1805,17 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
     vector<MapPoint*> vpMapPointEdgeStereo;
     vpMapPointEdgeStereo.reserve(nExpectedSize);
 
+    // Help to get current keyframe pose and pose_cov
+    size_t mono_edge_index = 0;
+    size_t body_edge_index = 0;
+    size_t stereo_edge_index = 0;
+    vector<size_t> current_keyframe_mono_edge_index;
+    vector<size_t> current_keyframe_body_edge_index;
+    vector<size_t> current_keyframe_stereo_edge_index;
+    current_keyframe_mono_edge_index.reserve(nExpectedSize);
+    current_keyframe_body_edge_index.reserve(nExpectedSize);
+    current_keyframe_stereo_edge_index.reserve(nExpectedSize);
+
     const float thHuberMono = sqrt(5.991);
     const float thHuberStereo = sqrt(7.815);
 
@@ -1867,7 +1879,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                     vpEdgesMono.push_back(e);
                     vpEdgeKFMono.push_back(pKFi);
                     vpMapPointEdgeMono.push_back(pMP);
-
+                    if(pKF->mnId == pKFi->mnId) {
+                        current_keyframe_mono_edge_index.push_back(mono_edge_index);
+                        mono_edge_index++;
+                    }
                     nEdges++;
                 } else if (leftIndex != -1 &&
                            pKFi->mvuRight[get<0>(mit->second)] >=
@@ -1908,7 +1923,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                     vpEdgesStereo.push_back(e);
                     vpEdgeKFStereo.push_back(pKFi);
                     vpMapPointEdgeStereo.push_back(pMP);
-
+                    if(pKF->mnId == pKFi->mnId) {
+                        current_keyframe_stereo_edge_index.push_back(stereo_edge_index);
+                        stereo_edge_index++;
+                    }
                     nEdges++;
                 }
 
@@ -1949,7 +1967,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                         vpEdgesBody.push_back(e);
                         vpEdgeKFBody.push_back(pKFi);
                         vpMapPointEdgeBody.push_back(pMP);
-
+                        if(pKF->mnId == pKFi->mnId) {
+                            current_keyframe_body_edge_index.push_back(body_edge_index);
+                            body_edge_index++;
+                        }
                         nEdges++;
                     }
                 }
@@ -2022,39 +2043,59 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                      vpEdgesStereo.size());
 
     // Check inlier observations
+
+
+    std::vector<bool> edge_mono_bad_vec;
+    std::vector<bool> edge_body_bad_vec;
+    std::vector<bool> edge_stereo_bad_vec;
+    edge_mono_bad_vec.reserve(vpEdgesMono.size());
+    edge_body_bad_vec.reserve(vpEdgesBody.size());
+    edge_stereo_bad_vec.reserve(vpEdgesStereo.size());
     for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++) {
+        edge_mono_bad_vec[i] = false;
         ORB_SLAM3::EdgeSE3ProjectXYZ* e = vpEdgesMono[i];
         MapPoint* pMP = vpMapPointEdgeMono[i];
 
-        if (pMP->isBad()) continue;
-
+        if (pMP->isBad()) {
+            edge_mono_bad_vec[i] = true;
+            continue;
+        }
         if (e->chi2() > 5.991 || !e->isDepthPositive()) {
             KeyFrame* pKFi = vpEdgeKFMono[i];
             vToErase.push_back(make_pair(pKFi, pMP));
+            edge_mono_bad_vec[i] = true;
         }
     }
 
     for (size_t i = 0, iend = vpEdgesBody.size(); i < iend; i++) {
+        edge_body_bad_vec[i] = false;
         ORB_SLAM3::EdgeSE3ProjectXYZToBody* e = vpEdgesBody[i];
         MapPoint* pMP = vpMapPointEdgeBody[i];
 
-        if (pMP->isBad()) continue;
-
+        if (pMP->isBad()) {
+            edge_body_bad_vec[i] = true;
+            continue;
+        }
         if (e->chi2() > 5.991 || !e->isDepthPositive()) {
             KeyFrame* pKFi = vpEdgeKFBody[i];
             vToErase.push_back(make_pair(pKFi, pMP));
+            edge_body_bad_vec[i] = true;
         }
     }
 
     for (size_t i = 0, iend = vpEdgesStereo.size(); i < iend; i++) {
+        edge_stereo_bad_vec[i] = false;
         g2o::EdgeStereoSE3ProjectXYZ* e = vpEdgesStereo[i];
         MapPoint* pMP = vpMapPointEdgeStereo[i];
 
-        if (pMP->isBad()) continue;
-
+        if (pMP->isBad()) {
+            edge_stereo_bad_vec[i] = true;
+            continue;
+        }
         if (e->chi2() > 7.815 || !e->isDepthPositive()) {
             KeyFrame* pKFi = vpEdgeKFStereo[i];
             vToErase.push_back(make_pair(pKFi, pMP));
+            edge_stereo_bad_vec[i] = true;
         }
     }
 
@@ -2081,6 +2122,15 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
             static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKFi->mnId));
         g2o::SE3Quat SE3quat = vSE3->estimate();
         pKFi->SetPose(Converter::toCvMat(SE3quat));
+        if(pose_state_from_localmap && (pKFi->mnId == pKF->mnId)) {
+            Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(pKFi->GetImuPose());
+            Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
+            Eigen::Quaterniond q(eigMat);
+            q.normalize();
+            Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
+            pose_state_from_localmap->q_wb = q;
+            pose_state_from_localmap->p_wb = vector;
+        }
     }
 
     // Points
@@ -2093,9 +2143,56 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
         pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
         pMP->UpdateNormalAndDepth();
     }
-
     // TODO Check this changeindex
     pMap->IncreaseChangeIndex();
+
+    // YHH
+    Eigen::Matrix<double, 6, 6> H_pose;
+    H_pose.setZero();
+    int tot_in = 0, tot_out = 0;
+    for(size_t i = 0; i < current_keyframe_mono_edge_index.size(); ++i) {
+        auto index = current_keyframe_mono_edge_index[i];
+        if(edge_mono_bad_vec[index]) {
+            tot_out++;
+        } else {
+            ORB_SLAM3::EdgeSE3ProjectXYZ* e = vpEdgesMono[i];
+            auto H_tmp = e->GetHessian();
+            H_pose.block<6, 6>(0, 0) += H_tmp.block<6, 6>(3, 3);
+            tot_in++;
+        }
+    }
+    for(size_t i = 0; i < current_keyframe_body_edge_index.size(); ++i) {
+        auto index = current_keyframe_body_edge_index[i];
+        if(edge_body_bad_vec[index]) {
+            tot_out++;
+        } else {
+            ORB_SLAM3::EdgeSE3ProjectXYZToBody* e = vpEdgesBody[i];
+            auto H_tmp = e->GetHessian();
+            H_pose.block<6, 6>(0, 0) += H_tmp.block<6, 6>(3, 3);
+            tot_in++;
+        }
+    }
+    for(size_t i = 0; i < current_keyframe_stereo_edge_index.size(); ++i) {
+        auto index = current_keyframe_stereo_edge_index[i];
+        if(edge_stereo_bad_vec[index]) {
+            tot_out++;
+        } else {
+            g2o::EdgeStereoSE3ProjectXYZ* e = vpEdgesStereo[i];
+            auto H_tmp = e->GetHessian();
+            H_pose.block<6, 6>(0, 0) += H_tmp.block<6, 6>(3, 3);
+            tot_in++;
+        }
+    }
+
+    Eigen::Matrix<double, 6, 6> H_pose_cov;
+    H_pose_cov.setZero();
+    H_pose_cov = H_pose.inverse();
+    // yhh
+    // ros publish current keyframe pose
+    if(pose_state_from_localmap) {
+        pose_state_from_localmap->time_sec = pKF->mTimeStamp;
+        pose_state_from_localmap->pose_cov = H_pose_cov;
+    }
 }
 
 void Optimizer::OptimizeEssentialGraph(
@@ -3991,6 +4088,7 @@ int Optimizer::OptimizeSim3(KeyFrame* pKF1,
 void Optimizer::LocalInertialBA(KeyFrame* pKF,
                                 bool* pbStopFlag,
                                 Map* pMap,
+                                ORB_SLAM3::PoseState *pose_state_from_localmap,
                                 int& num_fixedKF,
                                 int& num_OptKF,
                                 int& num_MPs,
@@ -4311,23 +4409,25 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
 
     // Mono
     vector<EdgeMono*> vpEdgesMono;
-    vpEdgesMono.reserve(nExpectedSize);
-
     vector<KeyFrame*> vpEdgeKFMono;
-    vpEdgeKFMono.reserve(nExpectedSize);
-
     vector<MapPoint*> vpMapPointEdgeMono;
+    vpEdgesMono.reserve(nExpectedSize);
+    vpEdgeKFMono.reserve(nExpectedSize);
     vpMapPointEdgeMono.reserve(nExpectedSize);
+    size_t mono_edge_index = 0;
+    vector<size_t> current_keyframe_mono_edge_index;
+    current_keyframe_mono_edge_index.reserve(nExpectedSize);
 
     // Stereo
     vector<EdgeStereo*> vpEdgesStereo;
-    vpEdgesStereo.reserve(nExpectedSize);
-
     vector<KeyFrame*> vpEdgeKFStereo;
-    vpEdgeKFStereo.reserve(nExpectedSize);
-
     vector<MapPoint*> vpMapPointEdgeStereo;
+    vpEdgesStereo.reserve(nExpectedSize);
+    vpEdgeKFStereo.reserve(nExpectedSize);
     vpMapPointEdgeStereo.reserve(nExpectedSize);
+    size_t stereo_edge_index = 0;
+    vector<size_t> current_keyframe_stereo_edge_index;
+    current_keyframe_stereo_edge_index.reserve(nExpectedSize);
 
     const float thHuberMono = sqrt(5.991);
     const float chi2Mono2 = 5.991;
@@ -4411,6 +4511,10 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
                     vpEdgesMono.push_back(e);
                     vpEdgeKFMono.push_back(pKFi);
                     vpMapPointEdgeMono.push_back(pMP);
+                    if(pKF->mnId == pKFi->mnId) {
+                        current_keyframe_mono_edge_index.push_back(mono_edge_index);
+                        mono_edge_index++;
+                    }
 
                     num_edges++;
                 }
@@ -4450,7 +4554,10 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
                     vpEdgesStereo.push_back(e);
                     vpEdgeKFStereo.push_back(pKFi);
                     vpMapPointEdgeStereo.push_back(pMP);
-
+                    if(pKF->mnId == pKFi->mnId) {
+                        current_keyframe_stereo_edge_index.push_back(stereo_edge_index);
+                        stereo_edge_index++;
+                    }
                     num_edges++;
                 }
 
@@ -4492,7 +4599,10 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
                         vpEdgesMono.push_back(e);
                         vpEdgeKFMono.push_back(pKFi);
                         vpMapPointEdgeMono.push_back(pMP);
-
+                        if(pKF->mnId == pKFi->mnId) {
+                            current_keyframe_mono_edge_index.push_back(mono_edge_index);
+                            mono_edge_index++;
+                        }
                         num_edges++;
                     }
                 }
@@ -4516,34 +4626,44 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
     if (pbStopFlag) optimizer.setForceStopFlag(pbStopFlag);
 
     vector<pair<KeyFrame*, MapPoint*>> vToErase;
+    std::vector<bool> edge_mono_bad_vec;
+    std::vector<bool> edge_stereo_bad_vec;
+    edge_mono_bad_vec.reserve(vpEdgesMono.size());
+    edge_stereo_bad_vec.reserve(vpEdgesStereo.size());
     vToErase.reserve(vpEdgesMono.size() + vpEdgesStereo.size());
 
     // Check inlier observations
     // Mono
     for (size_t i = 0, iend = vpEdgesMono.size(); i < iend; i++) {
+        edge_mono_bad_vec[i] = false;
         EdgeMono* e = vpEdgesMono[i];
         MapPoint* pMP = vpMapPointEdgeMono[i];
         bool bClose = pMP->mTrackDepth < 10.f;
-
-        if (pMP->isBad()) continue;
-
+        if (pMP->isBad()) {
+            edge_mono_bad_vec[i] = true;
+            continue;
+        }
         if ((e->chi2() > chi2Mono2 && !bClose) ||
             (e->chi2() > 1.5f * chi2Mono2 && bClose) || !e->isDepthPositive()) {
             KeyFrame* pKFi = vpEdgeKFMono[i];
             vToErase.push_back(make_pair(pKFi, pMP));
+            edge_mono_bad_vec[i] = true;
         }
     }
 
     // Stereo
     for (size_t i = 0, iend = vpEdgesStereo.size(); i < iend; i++) {
+        edge_stereo_bad_vec[i] = false;
         EdgeStereo* e = vpEdgesStereo[i];
         MapPoint* pMP = vpMapPointEdgeStereo[i];
-
-        if (pMP->isBad()) continue;
-
+        if (pMP->isBad()) {
+            edge_stereo_bad_vec[i] = true;
+            continue;
+        }
         if (e->chi2() > chi2Stereo2) {
             KeyFrame* pKFi = vpEdgeKFStereo[i];
             vToErase.push_back(make_pair(pKFi, pMP));
+            edge_stereo_bad_vec[i] = true;
         }
     }
 
@@ -4587,6 +4707,16 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
         cv::Mat Tcw =
             Converter::toCvSE3(VP->estimate().Rcw[0], VP->estimate().tcw[0]);
         pKFi->SetPose(Tcw);
+        // ros publish current keyframe pose
+        if(pose_state_from_localmap && (pKFi->mnId == pKF->mnId)) {
+            Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(pKFi->GetImuPose());
+            Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
+            Eigen::Quaterniond q(eigMat);
+            q.normalize();
+            Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
+            pose_state_from_localmap->q_wb = q;
+            pose_state_from_localmap->p_wb = vector;
+        }
         pKFi->mnBALocalForKF = 0;
 
         if (pKFi->bImu) {
@@ -4627,6 +4757,48 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
     }
 
     pMap->IncreaseChangeIndex();
+
+    Matrix15d H_pose;
+    H_pose.setZero();
+    Eigen::Matrix<double, 24, 24> Hei = vei[0]->GetHessian();
+    H_pose.block<9, 9>(0, 0) += Hei.block<9, 9>(15, 15);
+    Eigen::Matrix<double, 6, 6> Hgr = vegr[0]->GetHessian();
+    H_pose.block<3, 3>(9, 9) += Hgr.block<3, 3>(3, 3);
+    Eigen::Matrix<double, 6, 6> Har = vear[0]->GetHessian();
+    H_pose.block<3, 3>(12, 12) += Har.block<3, 3>(3, 3);
+
+    int tot_in = 0, tot_out = 0;
+    for(size_t i = 0; i < current_keyframe_mono_edge_index.size(); ++i) {
+        auto index = current_keyframe_mono_edge_index[i];
+        if(edge_mono_bad_vec[index]) {
+            tot_out++;
+        } else {
+            EdgeMono* e = vpEdgesMono[index];
+            auto H_tmp = e->GetHessian();
+            H_pose.block<6, 6>(0, 0) += H_tmp.block<6, 6>(3, 3);
+            tot_in++;
+        }
+    }
+    for(size_t i = 0; i < current_keyframe_stereo_edge_index.size(); ++i) {
+        auto index = current_keyframe_stereo_edge_index[i];
+        if(edge_stereo_bad_vec[index]) {
+            tot_out++;
+        } else {
+            EdgeStereo* e = vpEdgesStereo[index];
+            auto H_tmp = e->GetHessian();
+            H_pose.block<6, 6>(0, 0) += H_tmp.block<6, 6>(3, 3);
+            tot_in++;
+        }
+    }
+    Matrix15d H_pose_cov;
+    H_pose_cov.setZero();
+    H_pose_cov = H_pose.inverse();
+    // yhh
+    // ros publish current keyframe pose
+    if(pose_state_from_localmap) {
+        pose_state_from_localmap->time_sec = pKF->mTimeStamp;
+        pose_state_from_localmap->pose_cov = H_pose_cov.block<6, 6>(0, 0);
+    }
 }
 
 Eigen::MatrixXd Optimizer::Marginalize(const Eigen::MatrixXd& H,
@@ -7529,7 +7701,13 @@ int Optimizer::PoseInertialOptimizationLastFrame(Frame* pFrame, bool bRecInit) {
             tot_out++;
     }
 
+    // Before margin pre-frame
+    // Matrix15d H_pose = H.block<15, 15>(6, 6);
+    // Matrix15d H_pose_cov = H_pose.inverse();
     H = Marginalize(H, 0, 14);
+    // After margin pre-frame
+    Matrix15d H_pose = H.block<15, 15>(6, 6);
+    Matrix15d H_pose_cov = H_pose.inverse();
 
     pFrame->mpcpi = new ConstraintPoseImu(
         VP->estimate().Rwb, VP->estimate().twb, VV->estimate(), VG->estimate(),

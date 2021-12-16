@@ -170,6 +170,22 @@ System::System(const string &strVocFile,
     Verbose::SetTh(Verbose::VERBOSITY_QUIET);
 }
 
+bool System::set_lba_callback(LBACallback lba_callback) {
+    if(nullptr == lba_callback) {
+        return false;
+    }
+    if(nullptr == mpLocalMapper) {
+        std::cout << "localmap have not been initial! " << "\n";
+        return false;
+    }
+    lba_callback_ = std::move(lba_callback);
+    if(!mpLocalMapper->set_lba_callback(lba_callback_)) {
+        std::cout << "set_lba_callback false !!! " << "\n";
+        return false;
+    }
+    return true;
+}
+
 cv::Mat System::TrackStereo(const cv::Mat &imLeft,
                             const cv::Mat &imRight,
                             const double &timestamp,
