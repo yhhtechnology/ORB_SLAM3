@@ -59,7 +59,17 @@ class EdgeSE3ProjectXYZOnlyPose
     }
 
     virtual void linearizeOplus();
+    Eigen::Matrix<double, 2, 6> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J;
+    }
 
+    Eigen::Matrix<double, 6, 6> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J.transpose() * information() * J;
+    }
     Eigen::Vector3d Xw;
     GeometricCamera* pCamera;
 };
@@ -89,7 +99,17 @@ class EdgeSE3ProjectXYZOnlyPoseToBody
     }
 
     virtual void linearizeOplus();
+    Eigen::Matrix<double, 2, 6> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J;
+    }
 
+    Eigen::Matrix<double, 6, 6> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J.transpose() * information() * J;
+    }
     Eigen::Vector3d Xw;
     GeometricCamera* pCamera;
 
@@ -128,6 +148,22 @@ class EdgeSE3ProjectXYZ : public g2o::BaseBinaryEdge<2,
 
     virtual void linearizeOplus();
 
+    Eigen::Matrix<double, 2, 9> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 9> J;
+        J.block<2, 3>(0, 0) = _jacobianOplusXi;
+        J.block<2, 6>(0, 3) = _jacobianOplusXj;
+        return J;
+    }
+
+    Eigen::Matrix<double, 9, 9> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 9> J;
+        J.block<2, 3>(0, 0) = _jacobianOplusXi;
+        J.block<2, 6>(0, 3) = _jacobianOplusXj;
+        return J.transpose() * information() * J;
+    }
+
     GeometricCamera* pCamera;
 };
 
@@ -165,6 +201,21 @@ class EdgeSE3ProjectXYZToBody
 
     virtual void linearizeOplus();
 
+    Eigen::Matrix<double, 2, 9> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 9> J;
+        J.block<2, 3>(0, 0) = _jacobianOplusXi;
+        J.block<2, 6>(0, 3) = _jacobianOplusXj;
+        return J;
+    }
+
+    Eigen::Matrix<double, 9, 9> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 9> J;
+        J.block<2, 3>(0, 0) = _jacobianOplusXi;
+        J.block<2, 6>(0, 3) = _jacobianOplusXj;
+        return J.transpose() * information() * J;
+    }
     GeometricCamera* pCamera;
     g2o::SE3Quat mTrl;
 };
@@ -214,7 +265,9 @@ class EdgeSim3ProjectXYZ
             obs - v1->pCamera1->project(v1->estimate().map(v2->estimate()));
     }
 
+    // TODO()
     // virtual void linearizeOplus();
+
 };
 
 class EdgeInverseSim3ProjectXYZ

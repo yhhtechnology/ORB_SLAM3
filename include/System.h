@@ -32,6 +32,7 @@
 #include <string>
 #include <thread>
 #include <opencv2/core/core.hpp>
+#include <Eigen/Core>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -46,6 +47,14 @@
 #include "Config.h"
 
 namespace ORB_SLAM3 {
+
+struct PoseState {
+    double time_sec;
+    Eigen::Quaterniond q_wb;
+    Eigen::Vector3d p_wb;
+    Eigen::Matrix<double, 6, 6> pose_cov;
+};
+using BACallback = std::function<void(const PoseState&)>;
 
 class Verbose {
  public:
@@ -101,6 +110,11 @@ class System {
            const int initFr = 0,
            const string &strSequence = std::string(),
            const string &strLoadingFile = std::string());
+
+    BACallback lba_callback_ = nullptr;
+    BACallback tracking_ba_callback_ = nullptr;
+    bool setLbaCallback(BACallback lba_callback);
+    bool setTrackingbaCallback(BACallback tracking_ba_callback);
 
     // Proccess the given stereo frame. Images must be synchronized and
     // rectified.
@@ -223,7 +237,6 @@ class System {
     // Local Mapper. It manages the local map and performs local bundle
     // adjustment.
     LocalMapping *mpLocalMapper;
-
     // Loop Closer. It searches loops with every new keyframe. If there is a
     // loop it performs
     // a pose graph optimization and full bundle adjustment (in a new thread)

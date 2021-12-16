@@ -31,6 +31,7 @@
 #include "KeyFrame.h"
 #include "LoopClosing.h"
 #include "Frame.h"
+#include "System.h"
 
 #include <math.h>
 
@@ -81,19 +82,25 @@ class Optimizer {
                                       int &num_fixedKF,
                                       int &num_OptKF,
                                       int &num_MPs,
-                                      int &num_edges);
+                                      int &num_edges,
+                                      ORB_SLAM3::PoseState *pose_state);
 
     void static MergeBundleAdjustmentVisual(KeyFrame *pCurrentKF,
                                             vector<KeyFrame *> vpWeldingKFs,
                                             vector<KeyFrame *> vpFixedKFs,
                                             bool *pbStopFlag);
 
-    int static PoseOptimization(Frame *pFrame);
+    int static PoseOptimization(Frame *pFrame,
+        ORB_SLAM3::PoseState *pose_state = nullptr);
 
-    int static PoseInertialOptimizationLastKeyFrame(Frame *pFrame,
-                                                    bool bRecInit = false);
-    int static PoseInertialOptimizationLastFrame(Frame *pFrame,
-                                                 bool bRecInit = false);
+    int static PoseInertialOptimizationLastKeyFrame(
+        Frame *pFrame,
+        ORB_SLAM3::PoseState *pose_state = nullptr,
+        bool bRecInit = false);
+    int static PoseInertialOptimizationLastFrame(
+        Frame *pFrame,
+        ORB_SLAM3::PoseState *pose_state = nullptr,
+        bool bRecInit = false);
 
     // if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise
     // (mono)
@@ -163,12 +170,14 @@ class Optimizer {
     void static LocalInertialBA(KeyFrame *pKF,
                                 bool *pbStopFlag,
                                 Map *pMap,
+                                ORB_SLAM3::PoseState *pose_state,
                                 int &num_fixedKF,
                                 int &num_OptKF,
                                 int &num_MPs,
                                 int &num_edges,
                                 bool bLarge = false,
-                                bool bRecInit = false);
+                                bool bRecInit = false
+                                );
 
     void static MergeInertialBA(KeyFrame *pCurrKF,
                                 KeyFrame *pMergeKF,

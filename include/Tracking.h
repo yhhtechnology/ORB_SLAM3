@@ -57,9 +57,13 @@ class Atlas;
 class LocalMapping;
 class LoopClosing;
 class System;
+using BACallback = std::function<void(const ORB_SLAM3::PoseState&)>;
 
 class Tracking {
  public:
+    BACallback tracking_ba_callback_ = nullptr;
+    bool setTrackingbaCallback(BACallback tracking_ba_callback);
+
     Tracking(System *pSys,
              ORBVocabulary *pVoc,
              FrameDrawer *pFrameDrawer,
