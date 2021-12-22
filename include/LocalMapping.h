@@ -42,13 +42,13 @@ class Tracking;
 class LoopClosing;
 class Atlas;
 struct PoseState;
-using LBACallback = std::function<void(const ORB_SLAM3::PoseState&)>;
+using BACallback = std::function<void(const ORB_SLAM3::PoseState&)>;
 
 class LocalMapping {
  public:
 
-    LBACallback lba_callback_ = nullptr;
-    bool set_lba_callback(LBACallback lba_callback);
+    BACallback lba_callback_ = nullptr;
+    bool setLbaCallback(BACallback lba_callback);
 
     LocalMapping(System* pSys,
                  Atlas* pAtlas,

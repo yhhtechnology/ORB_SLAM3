@@ -170,7 +170,7 @@ System::System(const string &strVocFile,
     Verbose::SetTh(Verbose::VERBOSITY_QUIET);
 }
 
-bool System::set_lba_callback(LBACallback lba_callback) {
+bool System::setLbaCallback(BACallback lba_callback) {
     if(nullptr == lba_callback) {
         return false;
     }
@@ -179,8 +179,24 @@ bool System::set_lba_callback(LBACallback lba_callback) {
         return false;
     }
     lba_callback_ = std::move(lba_callback);
-    if(!mpLocalMapper->set_lba_callback(lba_callback_)) {
-        std::cout << "set_lba_callback false !!! " << "\n";
+    if(!mpLocalMapper->setLbaCallback(lba_callback_)) {
+        std::cout << "setLbaCallback false !!! " << "\n";
+        return false;
+    }
+    return true;
+}
+
+bool System::setTrackingbaCallback(BACallback tracking_ba_callback) {
+    if(nullptr == tracking_ba_callback) {
+        return false;
+    }
+    if(nullptr == mpTracker) {
+        std::cout << "Tracker have not been initial! " << "\n";
+        return false;
+    }
+    tracking_ba_callback_ = std::move(tracking_ba_callback);
+    if(!mpTracker->setTrackingbaCallback(tracking_ba_callback_)) {
+        std::cout << "setTrackingbaCallback false !!! " << "\n";
         return false;
     }
     return true;

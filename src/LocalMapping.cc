@@ -82,7 +82,7 @@ void LocalMapping::SetLoopCloser(LoopClosing *pLoopCloser) {
 
 void LocalMapping::SetTracker(Tracking *pTracker) { mpTracker = pTracker; }
 
-bool LocalMapping::set_lba_callback(LBACallback lba_callback) {
+bool LocalMapping::setLbaCallback(BACallback lba_callback) {
     if(nullptr == lba_callback) {
         return false;
     }

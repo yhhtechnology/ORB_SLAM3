@@ -54,7 +54,7 @@ struct PoseState {
     Eigen::Vector3d p_wb;
     Eigen::Matrix<double, 6, 6> pose_cov;
 };
-using LBACallback = std::function<void(const PoseState&)>;
+using BACallback = std::function<void(const PoseState&)>;
 
 class Verbose {
  public:
@@ -111,8 +111,10 @@ class System {
            const string &strSequence = std::string(),
            const string &strLoadingFile = std::string());
 
-    LBACallback lba_callback_ = nullptr;
-    bool set_lba_callback(LBACallback lba_callback);
+    BACallback lba_callback_ = nullptr;
+    BACallback tracking_ba_callback_ = nullptr;
+    bool setLbaCallback(BACallback lba_callback);
+    bool setTrackingbaCallback(BACallback tracking_ba_callback);
 
     // Proccess the given stereo frame. Images must be synchronized and
     // rectified.
