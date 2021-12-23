@@ -221,7 +221,17 @@ class EdgeSE3ProjectXYZOnlyPose
     }
 
     virtual void linearizeOplus();
+    Eigen::Matrix<double, 2, 6> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J;
+    }
 
+    Eigen::Matrix<double, 6, 6> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 2, 6> J = _jacobianOplusXi;
+        return J.transpose() * information() * J;
+    }
     Vector2d cam_project(const Vector3d& trans_xyz) const;
 
     Vector3d Xw;
@@ -253,7 +263,17 @@ class EdgeStereoSE3ProjectXYZOnlyPose
     }
 
     virtual void linearizeOplus();
+    Eigen::Matrix<double, 3, 6> GetJacobian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 3, 6> J = _jacobianOplusXi;
+        return J;
+    }
 
+    Eigen::Matrix<double, 6, 6> GetHessian() {
+        linearizeOplus();
+        Eigen::Matrix<double, 3, 6> J = _jacobianOplusXi;
+        return J.transpose() * information() * J;
+    }
     Vector3d cam_project(const Vector3d& trans_xyz) const;
 
     Vector3d Xw;

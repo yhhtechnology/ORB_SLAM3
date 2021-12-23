@@ -2780,54 +2780,53 @@ bool Tracking::TrackLocalMap() {
             if (mCurrentFrame.mvbOutlier[i]) aux2++;
         }
 
+    ORB_SLAM3::PoseState pose_state_from_localmap;
     int inliers;
-    if (!mpAtlas->isImuInitialized())
-        Optimizer::PoseOptimization(&mCurrentFrame);
+    if (!mpAtlas->isImuInitialized()) {
+        Optimizer::PoseOptimization(&mCurrentFrame, &pose_state_from_localmap);
+    }
     else {
         if (mCurrentFrame.mnId <= mnLastRelocFrameId + mnFramesToResetIMU) {
             Verbose::PrintMess("TLM: PoseOptimization ",
                                Verbose::VERBOSITY_DEBUG);
-            Optimizer::PoseOptimization(&mCurrentFrame);
+            Optimizer::PoseOptimization(&mCurrentFrame, &pose_state_from_localmap);
         } else {
             if (!mbMapUpdated) {
                 Verbose::PrintMess("TLM: PoseInertialOptimizationLastFrame ",
                                    Verbose::VERBOSITY_DEBUG);
                 inliers = Optimizer::PoseInertialOptimizationLastFrame(
-                    &mCurrentFrame);  // ,
+                    &mCurrentFrame, &pose_state_from_localmap);  // ,
                                       // !mpLastKeyFrame->GetMap()->GetIniertialBA1());
             } else {
                 Verbose::PrintMess("TLM: PoseInertialOptimizationLastKeyFrame ",
                                    Verbose::VERBOSITY_DEBUG);
                 inliers = Optimizer::PoseInertialOptimizationLastKeyFrame(
-                    &mCurrentFrame);  // ,
+                    &mCurrentFrame, &pose_state_from_localmap);  // ,
                                       // !mpLastKeyFrame->GetMap()->GetIniertialBA1());
             }
         }
     }
+
     // yhh
-    {
-        ORB_SLAM3::PoseState pose_state_from_localmap;
-        Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(mCurrentFrame.GetImuPose());
-        Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
-        Eigen::Quaterniond q(eigMat);
-        q.normalize();
-        Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
-        pose_state_from_localmap.q_wb = q;
-        pose_state_from_localmap.p_wb = vector;
-        pose_state_from_localmap.time_sec = mCurrentFrame.mTimeStamp;
-        // TODO
-        // pose_state_from_localmap.pose_cov = H_pose_cov;
-        if(tracking_ba_callback_) {
-            // std::cout
-            //     << "LBA::Tracking"<<"\n"
-            //     << "time_sec = " << pose_state_from_localmap.time_sec << "\n"
-            //     << "COV =\n " << pose_state_from_localmap.pose_cov << "\n"
-            //     <<"\n"
-            //     ;
-            // printf("tracking_ba_callback_  NOT NULL \n");
-            tracking_ba_callback_(pose_state_from_localmap);
-        }
+    Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(mCurrentFrame.GetImuPose());
+    Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
+    Eigen::Quaterniond q(eigMat);
+    q.normalize();
+    Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
+    pose_state_from_localmap.q_wb = q;
+    pose_state_from_localmap.p_wb = vector;
+    pose_state_from_localmap.time_sec = mCurrentFrame.mTimeStamp;
+    // pose_state_from_localmap.pose_cov = mCurrentFrame.H_pose_cov_;
+    if(tracking_ba_callback_) {
+        // std::cout
+        //     << "LBA::Tracking"<<"\n"
+        //     << "time_sec = " << pose_state_from_localmap.time_sec << "\n"
+        //     << "COV =\n " << pose_state_from_localmap.pose_cov << "\n"
+        //     <<"\n"
+        //     ;
+        tracking_ba_callback_(pose_state_from_localmap);
     }
+
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_EndPoseOpt =
         std::chrono::steady_clock::now();

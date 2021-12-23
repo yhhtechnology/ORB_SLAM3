@@ -817,7 +817,8 @@ void Optimizer::FullInertialBA(Map* pMap,
     pMap->IncreaseChangeIndex();
 }
 
-int Optimizer::PoseOptimization(Frame* pFrame) {
+int Optimizer::PoseOptimization(Frame* pFrame,
+    ORB_SLAM3::PoseState *pose_state) {
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolver_6_3::LinearSolverType* linearSolver;
 
@@ -1038,6 +1039,8 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
     const int its[4] = {10, 10, 10, 10};
 
     int nBad = 0;
+    Eigen::Matrix<double, 6, 6> H_pose;
+    H_pose.setZero();
     for (size_t it = 0; it < 4; it++) {
         vSE3->setEstimate(Converter::toSE3Quat(pFrame->mTcw));
         optimizer.initializeOptimization(0);
@@ -1062,8 +1065,10 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
             } else {
                 pFrame->mvbOutlier[idx] = false;
                 e->setLevel(0);
+                if(it == 3) {
+                    H_pose = e->GetHessian();
+                }
             }
-
             if (it == 2) e->setRobustKernel(0);
         }
 
@@ -1085,6 +1090,9 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
             } else {
                 pFrame->mvbOutlier[idx] = false;
                 e->setLevel(0);
+                if(it == 3) {
+                    H_pose = e->GetHessian();
+                }
             }
 
             if (it == 2) e->setRobustKernel(0);
@@ -1108,6 +1116,9 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
             } else {
                 e->setLevel(0);
                 pFrame->mvbOutlier[idx] = false;
+                if(it == 3) {
+                    H_pose = e->GetHessian();
+                }
             }
 
             if (it == 2) e->setRobustKernel(0);
@@ -1122,6 +1133,10 @@ int Optimizer::PoseOptimization(Frame* pFrame) {
     g2o::SE3Quat SE3quat_recov = vSE3_recov->estimate();
     cv::Mat pose = Converter::toCvMat(SE3quat_recov);
     pFrame->SetPose(pose);
+    // // set pose covariance
+    if(nullptr != pose_state) {
+        pose_state->pose_cov = H_pose.inverse();
+    }
 
     return nInitialCorrespondences - nBad;
 }
@@ -1623,7 +1638,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
                                       int& num_OptKF,
                                       int& num_MPs,
                                       int& num_edges,
-                                      ORB_SLAM3::PoseState *pose_state_from_localmap) {
+                                      ORB_SLAM3::PoseState *pose_state) {
     // Local KeyFrames: First Breath Search from Current Keyframe
     list<KeyFrame*> lLocalKeyFrames;
 
@@ -2122,14 +2137,14 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
             static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKFi->mnId));
         g2o::SE3Quat SE3quat = vSE3->estimate();
         pKFi->SetPose(Converter::toCvMat(SE3quat));
-        if(pose_state_from_localmap && (pKFi->mnId == pKF->mnId)) {
+        if(pose_state && (pKFi->mnId == pKF->mnId)) {
             Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(pKFi->GetImuPose());
             Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
             Eigen::Quaterniond q(eigMat);
             q.normalize();
             Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
-            pose_state_from_localmap->q_wb = q;
-            pose_state_from_localmap->p_wb = vector;
+            pose_state->q_wb = q;
+            pose_state->p_wb = vector;
         }
     }
 
@@ -2189,9 +2204,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pKF,
     H_pose_cov = H_pose.inverse();
     // yhh
     // ros publish current keyframe pose
-    if(pose_state_from_localmap) {
-        pose_state_from_localmap->time_sec = pKF->mTimeStamp;
-        pose_state_from_localmap->pose_cov = H_pose_cov;
+    if(pose_state) {
+        pose_state->time_sec = pKF->mTimeStamp;
+        pose_state->pose_cov = H_pose_cov;
     }
 }
 
@@ -4088,7 +4103,7 @@ int Optimizer::OptimizeSim3(KeyFrame* pKF1,
 void Optimizer::LocalInertialBA(KeyFrame* pKF,
                                 bool* pbStopFlag,
                                 Map* pMap,
-                                ORB_SLAM3::PoseState *pose_state_from_localmap,
+                                ORB_SLAM3::PoseState *pose_state,
                                 int& num_fixedKF,
                                 int& num_OptKF,
                                 int& num_MPs,
@@ -4708,14 +4723,14 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
             Converter::toCvSE3(VP->estimate().Rcw[0], VP->estimate().tcw[0]);
         pKFi->SetPose(Tcw);
         // ros publish current keyframe pose
-        if(pose_state_from_localmap && (pKFi->mnId == pKF->mnId)) {
+        if(pose_state && (pKFi->mnId == pKF->mnId)) {
             Eigen::Matrix<double, 4, 4> Twb = Converter::toMatrix4d(pKFi->GetImuPose());
             Eigen::Matrix<double, 3, 3> eigMat = Twb.block<3, 3>(0, 0);
             Eigen::Quaterniond q(eigMat);
             q.normalize();
             Eigen::Vector3d vector = Twb.block<3, 1>(0, 3);
-            pose_state_from_localmap->q_wb = q;
-            pose_state_from_localmap->p_wb = vector;
+            pose_state->q_wb = q;
+            pose_state->p_wb = vector;
         }
         pKFi->mnBALocalForKF = 0;
 
@@ -4795,9 +4810,9 @@ void Optimizer::LocalInertialBA(KeyFrame* pKF,
     H_pose_cov = H_pose.inverse();
     // yhh
     // ros publish current keyframe pose
-    if(pose_state_from_localmap) {
-        pose_state_from_localmap->time_sec = pKF->mTimeStamp;
-        pose_state_from_localmap->pose_cov = H_pose_cov.block<6, 6>(0, 0);
+    if(pose_state) {
+        pose_state->time_sec = pKF->mTimeStamp;
+        pose_state->pose_cov = H_pose_cov.block<6, 6>(0, 0);
     }
 }
 
@@ -6911,8 +6926,10 @@ void Optimizer::MergeInertialBA(KeyFrame* pCurrKF,
     pMap->IncreaseChangeIndex();
 }
 
-int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame* pFrame,
-                                                    bool bRecInit) {
+int Optimizer::PoseInertialOptimizationLastKeyFrame(
+    Frame* pFrame,
+    ORB_SLAM3::PoseState *pose_state,
+    bool bRecInit) {
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolverX::LinearSolverType* linearSolver;
 
@@ -7289,6 +7306,12 @@ int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame* pFrame,
             tot_out++;
     }
 
+    // set pose covariance
+    if(nullptr != pose_state) {
+        pose_state->pose_cov = H.block<6, 6>(0, 0).inverse();
+        
+    }
+
     pFrame->mpcpi = new ConstraintPoseImu(VP->estimate().Rwb,
                                           VP->estimate().twb, VV->estimate(),
                                           VG->estimate(), VA->estimate(), H);
@@ -7296,7 +7319,11 @@ int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame* pFrame,
     return nInitialCorrespondences - nBad;
 }
 
-int Optimizer::PoseInertialOptimizationLastFrame(Frame* pFrame, bool bRecInit) {
+int Optimizer::PoseInertialOptimizationLastFrame(
+    Frame* pFrame,
+    ORB_SLAM3::PoseState *pose_state,
+    bool bRecInit) {
+
     g2o::SparseOptimizer optimizer;
     g2o::BlockSolverX::LinearSolverType* linearSolver;
 
@@ -7702,13 +7729,13 @@ int Optimizer::PoseInertialOptimizationLastFrame(Frame* pFrame, bool bRecInit) {
     }
 
     // Before margin pre-frame
-    // Matrix15d H_pose = H.block<15, 15>(6, 6);
-    // Matrix15d H_pose_cov = H_pose.inverse();
     H = Marginalize(H, 0, 14);
     // After margin pre-frame
-    Matrix15d H_pose = H.block<15, 15>(6, 6);
-    Matrix15d H_pose_cov = H_pose.inverse();
-
+    Eigen::Matrix<double, 6, 6> H_pose = H.block<6, 6>(15, 15);
+    // set pose covariance
+    if(nullptr != pose_state) {
+        pose_state->pose_cov = H_pose.inverse();
+    }
     pFrame->mpcpi = new ConstraintPoseImu(
         VP->estimate().Rwb, VP->estimate().twb, VV->estimate(), VG->estimate(),
         VA->estimate(), H.block<15, 15>(15, 15));

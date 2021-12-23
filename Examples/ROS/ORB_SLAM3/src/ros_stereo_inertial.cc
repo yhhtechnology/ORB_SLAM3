@@ -181,6 +181,9 @@ int main(int argc, char **argv) {
     auto tracking_ba_callback = ORB_SLAM3::BACallback(std::bind(&publishTrackingBAState, std::placeholders::_1));
     if(!SLAM.setTrackingbaCallback(tracking_ba_callback) ||
         !SLAM.setLbaCallback(lba_callback)) {
+        cerr << endl
+             << "setTrackingbaCallback || setLbaCallback ERROR!!! "
+             << endl;
         ros::shutdown();
         return 1;
     }
